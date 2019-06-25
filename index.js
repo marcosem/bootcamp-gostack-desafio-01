@@ -1,103 +1,87 @@
 const express = require('express');
-
 const server = express();
 
 // Necessary to use JSon on POST
 server.use(express.json());
 
-const proj = JSON.parse('{ "projects": [] }');
-var requests = 0;
+// Query params = ?test=1  (req.query.test)
+// Route params = /users/1 (/users/:id  - req.params.id, or const { id } = req.params)
+// Request body = {"name":"Marcos"}
+const users = ['Marcos', 'Eduardo', 'Mathias'];
 
-// count the number of requests
-function ReqCount(req, res, next) {
-  requests++;
-  console.log(`Number of requests: ${requests}`);
-  return next();
-}
+// This is a middleware
+// middleware is a intercept function. Without the next, it will not allow execute anything after it.
+server.use((req, res, next) => {
+  console.time('MyTimer');
+  console.log(`Method: ${req.method}; URL: ${req.url};`);
+  //return next();
+  // It will execute all routes before junt to anything after next
+  next();
+  console.timeEnd('MyTimer');
+});
 
 // Middlewares can change the variables req, and res, before continue
-function checkValidProject(req, res, next) {
-  const { id } = req.params;
-
-  // Return the index of the element by id
-  const index = proj.projects.findIndex((pro, i) => {
-    return pro.id === id;
-  });
-
-  if (index === -1) {
-    return res.status(400).json({ error: 'Project not found!' });
+function checkUserExists(req, res, next) {
+  if (!req.body.name) {
+    return res.status(400).json({ error: 'User name is required!' });
   }
-
-  req.index = index;
 
   return next();
 }
 
-// Add a new project
-server.post('/projects', ReqCount, (req, res) => {
-  const project = req.body;
+function checkUserIndex(req, res, next) {
+  const user = users[req.params.index];
 
-  proj.projects.push(project);
+  if (!user) {
+    return res.status(400).json({ error: 'User does not exist!' });
+  }
 
-  return res.json(proj);
+  req.user = user;
+
+  return next();
+}
+
+// CRUD - Create, Read, Update, Delete
+server.get('/users', (req, res) => {
+  return res.json(users);
 });
 
-// List all Projects
-server.get('/projects', ReqCount, (req, res) => {
-  return res.json(proj);
+// Get User
+server.get('/users/:index', checkUserIndex, (req, res) => {
+  //const { index } = req.params;
+
+  //return res.json({ message: 'Hellow!' });
+  //return res.json(users[index]);
+  return res.json(req.user);
 });
 
-// Edit a project title by id
-server.put('/projects/:id', checkValidProject, ReqCount, (req, res) => {
-  const { id } = req.params;
-  const { title } = req.body;
+// Add user
+server.post('/users', checkUserExists, (req, res) => {
+  const { name } = req.body;
 
-  // return the element by id
-  /*
-  const project = proj.projects.filter(pro => {
-    return pro.id === id;
-  });
-  */
+  users.push(name);
 
-  proj.projects[req.index].title = title;
-
-  //project[0].title = title;
-
-  return res.json(proj);
+  return res.json(users);
 });
 
-// Delete a project by id
-server.delete('/projects/:id', checkValidProject, ReqCount, (req, res) => {
-  const { id } = req.params;
+// Edit user
+server.put('/users/:index', checkUserExists, checkUserIndex, (req, res) => {
+  const { index } = req.params;
+  const { name } = req.body;
 
-  // Return the index of the element by id
-  /*
-  const index = proj.projects.findIndex((pro, i) => {
-    return pro.id === id;
-  });
-  */
+  users[index] = name;
 
-  proj.projects.splice(req.index, 1);
+  return res.json(users);
+});
+
+// Delete user
+server.delete('/users/:index', checkUserIndex, (req, res) => {
+  const { index } = req.params;
+
+  // take the array at index "index" and remove the number of elements (1)
+  users.splice(index, 1);
 
   return res.send();
 });
 
-// Add a new task to a project by id
-server.post('/projects/:id/tasks', checkValidProject, ReqCount, (req, res) => {
-  const { id } = req.params;
-  const { title } = req.body; // Title of the task
-
-  // return the element by id
-  /*
-  const project = proj.projects.filter(pro => {
-    return pro.id === id;
-  });
-  */
-
-  proj.projects[req.index].tasks.push(title);
-  //project[0].tasks.push(title);
-
-  return res.json(proj);
-});
-
-server.listen(3333);
+server.listen(3000);
